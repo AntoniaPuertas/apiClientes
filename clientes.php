@@ -11,23 +11,71 @@ include "utils.php";
 //realiza la conexion
 $dbConn = connect($db);
 
-//Devuelve todos los elementos o uno solo
-if($_SERVER['REQUEST_METHOD'] == 'GET'){
+//comprueba el método de la llamada
+$peticion = $_SERVER['REQUEST_METHOD'];
 
-    if(isset($_GET['id'])){
-        $id = $_GET['id'];
-        //devuelve los datos del registro correspondiente al id
-        $sql = $dbConn->prepare("SELECT * FROM clientes WHERE id=?");
+//comprueba la autorización en las cabeceras
+$cabeceras = apache_request_headers();
+
+if(comprobarAutorizacion($cabeceras, $dbConn)){
+    switch ($peticion) {
+        case 'GET':
+            peticionGet($dbConn);
+            break;
+        case 'POST':
+            setNewCliente($dbConn);
+            break;
+        case 'DELETE':
+            deleteCliente($dbConn);
+            break;
+        case 'PUT':
+            modificaCliente($dbConn);
+            break;
+        default:
+            header("HTTP/1.1 400 Bad Request");
+    }
+}
+
+
+function comprobarAutorizacion($cabeceras, $dbConn){
+    if(isset($cabeceras['auth'])){
+        //comprueba si la key es correcta
+        //esta key debería estar guardada en la bd
+        $id = 1;
+        $sql = $dbConn->prepare("SELECT clave FROM usuario WHERE id=?");
         $sql->bindParam(1, $id);
         $sql->execute();
+        $respuesta = $sql->fetch(PDO::FETCH_ASSOC);
+        if($respuesta['clave'] == $cabeceras['auth']){
+            return true;
+        }
+    }
+    return false;
+}
 
-        //devuelve los datos
-        header("HTTP/1.1 200 OK");
-        echo json_encode($sql->fetch(PDO::FETCH_ASSOC));
-        exit();
-
+function peticionGet($dbConn){
+    if(isset($_GET['id'])){
+        getClientById($dbConn);
     }else{
-        //devuelve todos los datos de la tabla
+        getAllClients($dbConn);
+    }
+}
+
+function getClientById($dbConn){
+    $id = $_GET['id'];
+    //devuelve los datos del registro correspondiente al id
+    $sql = $dbConn->prepare("SELECT * FROM clientes WHERE id=?");
+    $sql->bindParam(1, $id);
+    $sql->execute();
+
+    //devuelve los datos
+    header("HTTP/1.1 200 OK");
+    echo json_encode($sql->fetch(PDO::FETCH_ASSOC));
+    exit();
+}
+
+function getAllClients($dbConn){
+//devuelve todos los datos de la tabla
         //hace la consulta
         $sql = $dbConn->prepare("SELECT * FROM clientes");
         $sql->execute();
@@ -37,12 +85,10 @@ if($_SERVER['REQUEST_METHOD'] == 'GET'){
         header("HTTP/1.1 200 OK");
         echo json_encode($sql->fetchAll());
         exit();
-    }
-
 }
 
-//crear un nuevo elemento
-if($_SERVER['REQUEST_METHOD'] == 'POST'){
+function setNewCliente($dbConn){
+    //crear un nuevo elemento
     $sql = "INSERT INTO clientes (nombre, apellidos, telefono, email, detalle)
             VALUES (?,?,?,?,?)";
     $statement = $dbConn->prepare($sql);
@@ -65,8 +111,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST'){
     }
 }
 
-//borrar un elemento
-if($_SERVER['REQUEST_METHOD'] == 'DELETE'){
+function deleteCliente($dbConn){
+    //borrar un elemento
     if(isset($_GET['id'])){
         $id = $_GET['id'];
 
@@ -78,9 +124,8 @@ if($_SERVER['REQUEST_METHOD'] == 'DELETE'){
     }
 }
 
-//Actualizar o modificar
-if($_SERVER['REQUEST_METHOD'] == 'PUT'){
-    
+function modificaCliente($dbConn){
+    //modificar un elemento
     $nombre = $_GET['nombre'];
     $apellidos = $_GET['apellidos'];
     $telefono = $_GET['telefono'];
@@ -109,5 +154,3 @@ if($_SERVER['REQUEST_METHOD'] == 'PUT'){
     header("HTTP/1.1 200 OK");
     exit();
 }
-//Si llega aquí la ejecución es que la llamada no es válida
-header("HTTP/1.1 400 Bad Request");
