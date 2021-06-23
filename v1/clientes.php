@@ -244,8 +244,8 @@ function modificaCliente($dbConn, $datos){
             $id = $datos['id'];
         }else{
             //faltan datos
-            header("HTTP/1.1 400 Bad Request");
-            echo json_encode(["400" => "Solicitud incorrecta"]);
+            header("HTTP/1.1 422 Unprocessable Entity");
+            echo json_encode(["422" => "Solicitud incorrecta"]);
             exit();
         }
 
