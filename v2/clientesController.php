@@ -6,13 +6,12 @@
 
 include_once("model/clientes.php");
 include_once("model/usuarios.php");
+include_once("cabeceras.php");
 
 //comprueba el método de la llamada
 $peticion = $_SERVER['REQUEST_METHOD'];
 
-//comprueba la autorización en las cabeceras
-$cabeceras = apache_request_headers();
-
+$cabeceras = Cabeceras::getCabeceras();
 
 
 if(Usuarios::comprobarAutorizacion($cabeceras)){
