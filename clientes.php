@@ -23,20 +23,26 @@ if(comprobarAutorizacion($cabeceras, $dbConn)){
             peticionGet($dbConn);
             break;
         case 'POST':
-            setNewCliente($dbConn);
+            setNewCliente($dbConn, $_POST);
             break;
         case 'DELETE':
-            deleteCliente($dbConn);
+            deleteCliente($dbConn, $_GET);
             break;
         case 'PUT':
-            modificaCliente($dbConn);
+            modificaCliente($dbConn, $_GET);
             break;
         default:
             header("HTTP/1.1 400 Bad Request");
     }
 }
 
-
+/**
+ * comprueba que la petición venga con una clave que exista en la base con el usuario id = 1
+ * @param $cabeceras cabeceras de la petición
+ * @param $dbConn objeto con la conexión a la base
+ * 
+ * @return verdadero o falso
+ */
 function comprobarAutorizacion($cabeceras, $dbConn){
     if(isset($cabeceras['auth'])){
         //comprueba si la key es correcta
@@ -53,104 +59,250 @@ function comprobarAutorizacion($cabeceras, $dbConn){
     return false;
 }
 
+/**
+ * Comprueba si en la petición viene un parámetro id
+ * @param $dbConn objeto con la conexión a la base
+ * @return llama a la función que corresponda
+ */
 function peticionGet($dbConn){
     if(isset($_GET['id'])){
-        getClientById($dbConn);
+        getClientById($dbConn, $_GET['id']);
     }else{
         getAllClients($dbConn);
     }
 }
 
-function getClientById($dbConn){
-    $id = $_GET['id'];
-    //devuelve los datos del registro correspondiente al id
-    $sql = $dbConn->prepare("SELECT * FROM clientes WHERE id=?");
-    $sql->bindParam(1, $id);
-    $sql->execute();
+/**
+ * Busca un cliente por su id
+ * @param $dbConn objeto con la conexión a la base
+ * @param $id id del cliente a buscar
+ * @return respuesta con el resultado de la consulta: datos del cliente o error
+ */
+function getClientById($dbConn, $id){
 
-    //devuelve los datos
-    header("HTTP/1.1 200 OK");
-    echo json_encode($sql->fetch(PDO::FETCH_ASSOC));
+    try{
+        //prepara la sentencia
+        $sql = $dbConn->prepare("SELECT * FROM clientes WHERE id=?");
+        //relaciona los parámetros
+        $sql->bindParam(1, $id);
+
+        //ejecuta la sentencia preparada
+        $sql->execute();
+        $respuesta = $sql->fetch(PDO::FETCH_ASSOC);
+
+        if($respuesta){
+            //devuelve los datos
+            header("HTTP/1.1 200 OK");
+            echo json_encode($respuesta);
+        }else{
+            //no se ha encontrado el cliente
+            header("HTTP/1.1 404 Not Found");
+            echo json_encode(["404" => "No encontrado"]);
+        }
+
+    }catch (PDOException $e) {
+        //se produjo un error
+        $error = $e->getMessage();
+        echo json_encode(["error" => $error]);
+    }
+    //termina la ejecución del script
     exit();
 }
 
+
+/**
+ * Devuelve todos los clientes
+ * @param $dbConn objeto con la conexión a la base
+ * @return lista con todos los clientes o error
+ */
 function getAllClients($dbConn){
-//devuelve todos los datos de la tabla
-        //hace la consulta
+    try{
+        //prepara la sentencia
         $sql = $dbConn->prepare("SELECT * FROM clientes");
+        //ejecuta la sentencia
         $sql->execute();
+
         $sql->setFetchMode(PDO::FETCH_ASSOC);
 
-        //devuelve los datos
-        header("HTTP/1.1 200 OK");
-        echo json_encode($sql->fetchAll());
-        exit();
-}
+        $respuesta = $sql->fetchAll();
 
-function setNewCliente($dbConn){
-    //crear un nuevo elemento
-    $sql = "INSERT INTO clientes (nombre, apellidos, telefono, email, detalle)
-            VALUES (?,?,?,?,?)";
-    $statement = $dbConn->prepare($sql);
-    $statement->bindParam(1, $_POST['nombre']);
-    $statement->bindParam(2, $_POST['apellidos']);
-    $statement->bindParam(3, $_POST['telefono']);
-    $statement->bindParam(4, $_POST['email']);
-    $statement->bindParam(5, $_POST['detalle']);
+        if($respuesta){
+            //devuelve los datos
+            header("HTTP/1.1 200 OK");
+            echo json_encode($respuesta);
+        }else{
+            //no hay datos
+            header("HTTP/1.1 404 Not Found");
+            echo json_encode(["404" => "No encontrado"]);
+        }
 
-    $statement->execute();
-
-    $clienteId = $dbConn->lastInsertId();
-
-    if($clienteId){
-        $input['id'] = $clienteId;
-        //devuelve los datos
-        //header("HTTP/1.1 200 OK");
-        echo json_encode($input);
-        exit();
+    }catch (PDOException $e) {
+        //se produjo un error
+        $error = $e->getMessage();
+        echo json_encode(["error" => $error]);
     }
+
+        exit();
 }
 
-function deleteCliente($dbConn){
-    //borrar un elemento
-    if(isset($_GET['id'])){
-        $id = $_GET['id'];
+/**
+ * Inserta nuevo cliente
+ * @param $dbConn objeto con la conexión a la base
+ * @param $cliente array con los datos del nuevo cliente
+ * @return id del cliente insertado o error
+ */
+function setNewCliente($dbConn, $cliente){
+    try{
+        //crea la consulta
+        $sql = "INSERT INTO clientes (nombre, apellidos, telefono, email, detalle)
+                VALUES (?,?,?,?,?)";
 
-        $statement = $dbConn->prepare("DELETE FROM clientes WHERE id=?");
-        $statement->bindParam(1, $id);
+        //prepara la sentencia
+        $statement = $dbConn->prepare($sql);
+
+        //relaciona los parámetros
+        $statement->bindParam(1, $cliente['nombre']);
+        $statement->bindParam(2, $cliente['apellidos']);
+        $statement->bindParam(3, $cliente['telefono']);
+        $statement->bindParam(4, $cliente['email']);
+        $statement->bindParam(5, $cliente['detalle']);
+
+        //ejecuta la sentencia
         $statement->execute();
-        header("HTTP/1.1 200 OK");
-        exit();
+
+        //rescatamos el id del cliente insertado
+        $clienteId = $dbConn->lastInsertId();
+
+        if($clienteId){
+            $input['id'] = $clienteId;
+            //devuelve los datos
+            header("HTTP/1.1 200 OK");
+            echo json_encode($input);
+        }
+    }catch (PDOException $e) {
+        //se produjo un error
+        $error = $e->getMessage();
+        echo json_encode(["error" => $error]);
     }
+        exit();
 }
 
-function modificaCliente($dbConn){
-    //modificar un elemento
-    $nombre = $_GET['nombre'];
-    $apellidos = $_GET['apellidos'];
-    $telefono = $_GET['telefono'];
-    $email = $_GET['email'];
-    $detalle = $_GET['detalle'];
-    $id = $_GET['id'];
+/**
+ * Elimina un cliente por su id
+ * @param $dbConn objeto con la conexión a la base
+ * @param $datos con el id
+ * @return resultado de la eliminación
+ */
+function deleteCliente($dbConn, $datos){
+    if(isset($datos['id'])){
+        $id = $datos['id'];
+        try{
+            //prepara la consulta
+            $statement = $dbConn->prepare("DELETE FROM clientes WHERE id=?");
 
-    $sql = "UPDATE clientes
-            SET nombre = ?,
-            apellidos = ?,
-            telefono = ?,
-            email = ?,
-            detalle = ?
-            WHERE id = ?";
+            //relaciona los parámetros
+            $statement->bindParam(1, $id);
 
-    $statement = $dbConn->prepare($sql);
+            //ejecuta la sentencia
+            $statement->execute();
 
-    $statement->bindParam(1, $nombre);
-    $statement->bindParam(2, $apellidos);
-    $statement->bindParam(3, $telefono);
-    $statement->bindParam(4, $email);
-    $statement->bindParam(5, $detalle);
-    $statement->bindParam(6, $id);
+            //comprobamos el número de filas que se han borrado
+            $registros = $statement->rowCount();
 
-    $statement->execute();
-    header("HTTP/1.1 200 OK");
+            header("HTTP/1.1 200 OK");
+            echo json_encode(["Registros eliminados" => $registros]);
+
+        }catch (PDOException $e) {
+            //se produjo un error
+            $error = $e->getMessage();
+           echo json_encode(["error" => $error]);
+        } 
+    }else{
+        //falta el id
+        header("HTTP/1.1 400 Bad Request");
+        echo json_encode(["400" => "Solicitud incorrecta"]);
+    }
+
+        exit();
+
+}
+
+/**
+ * Actualiza un cliente relacionado con un id de la base de datos 
+ * @param $dbConn objeto con la conexión a la base
+ * @param $datos nuevos datos
+ * @return resultado de la modificación
+ */
+function modificaCliente($dbConn, $datos){
+        //comprueba si vienen todos los datos necesarios para la modificación
+        if(datosCorrectos($datos)){
+            $nombre = $datos['nombre'];         
+            $apellidos = $datos['apellidos'];
+            $telefono = $datos['telefono'];
+            $email = $datos['email'];
+            $detalle = $datos['detalle'];
+            $id = $datos['id'];
+        }else{
+            //faltan datos
+            header("HTTP/1.1 400 Bad Request");
+            echo json_encode(["400" => "Solicitud incorrecta"]);
+            exit();
+        }
+
+    try{
+        //crea la consulta
+        $sql = "UPDATE clientes
+                SET nombre = ?,
+                apellidos = ?,
+                telefono = ?,
+                email = ?,
+                detalle = ?
+                WHERE id = ?";
+        //prepara la sentencia
+        $statement = $dbConn->prepare($sql);
+
+        //relaciona los parámetros
+        $statement->bindParam(1, $nombre);
+        $statement->bindParam(2, $apellidos);
+        $statement->bindParam(3, $telefono);
+        $statement->bindParam(4, $email);
+        $statement->bindParam(5, $detalle);
+        $statement->bindParam(6, $id);
+
+        //ejecuta la consulta
+        $statement->execute();
+
+        //comprueba cuantos registros han sido modificados
+        $registros = $statement->rowCount();
+
+        header("HTTP/1.1 200 OK");
+        echo json_encode(["Registros modificados" => $registros]);
+
+    }catch (PDOException $e) {
+        //se produjo un error
+        $error = $e->getMessage();
+       echo json_encode(["error" => $error]);
+    } 
     exit();
+}
+
+
+/**
+ * Comprueba que vengan los parámetros y que no vengan vacíos
+ * @param array con los datos
+ * @return verdadero o falso
+ */
+function datosCorrectos($datos){
+    return isset($datos['nombre']) && 
+                 !empty(trim($datos['nombre'])) &&
+                 isset($datos['apellidos']) && 
+                 !empty(trim($datos['apellidos'])) &&
+                 isset($datos['telefono']) && 
+                 !empty(trim($datos['telefono'])) &&
+                 isset($datos['email']) && 
+                 !empty(trim($datos['email'])) &&
+                 isset($datos['detalle']) && 
+                 !empty(trim($datos['detalle'])) &&
+                 isset($datos['id']) && 
+                 !empty(trim($datos['id']));
 }
