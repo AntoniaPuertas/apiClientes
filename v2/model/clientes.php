@@ -26,7 +26,7 @@ class Clientes {
     public static function getClientById($id){
         //realiza la conexion
         $dbConn = Conexion::connect();
-
+        $resultado = array();
         try{
             //prepara la sentencia
             $sql = $dbConn->prepare("SELECT * FROM " . self::NOMBRE_TABLA . " WHERE " . self::ID . " =?");
@@ -38,22 +38,22 @@ class Clientes {
             $respuesta = $sql->fetch(PDO::FETCH_ASSOC);
 
             if($respuesta){
-                //devuelve los datos
-                header("HTTP/1.1 200 OK");
-                echo json_encode($respuesta);
+                //guarda los datos en el array
+                $resultado['cabecera'] = "HTTP/1.1 200 OK";
+                $resultado['datos'] = $respuesta;
             }else{
                 //no se ha encontrado el cliente
-                header("HTTP/1.1 404 Not Found");
-                echo json_encode(["404" => "No encontrado"]);
+                $resultado['cabecera'] = "HTTP/1.1 404 Not Found";
+                $resultado['datos'] = "No encontrado";
             }
 
         }catch (PDOException $e) {
             //se produjo un error
-            $error = $e->getMessage();
-            echo json_encode(["error" => $error]);
+            $resultado['cabecera'] = "HTTP/1.1 500 Internal Server Error";
+            $resultado['datos'] = $e->getMessage();
         }
-        //termina la ejecución del script
-        exit();
+        //devuelve el resultado
+        return $resultado;
     }
 
 
@@ -64,7 +64,7 @@ class Clientes {
     public static function getAllClients(){
         //realiza la conexion
         $dbConn = Conexion::connect();
-
+        $resultado = array();
         try{
             //prepara la sentencia
             $sql = $dbConn->prepare("SELECT * FROM " . self::NOMBRE_TABLA);
@@ -76,22 +76,23 @@ class Clientes {
             $respuesta = $sql->fetchAll();
 
             if($respuesta){
-                //devuelve los datos
-                header("HTTP/1.1 200 OK");
-                echo json_encode($respuesta);
+                //guarda los datos en el array
+                $resultado['cabecera'] = "HTTP/1.1 200 OK";
+                $resultado['datos'] = $respuesta;
             }else{
                 //no hay datos
-                header("HTTP/1.1 404 Not Found");
-                echo json_encode(["404" => "No encontrado"]);
+                $resultado['cabecera'] = "HTTP/1.1 404 Not Found";
+                $resultado['datos'] = "No encontrado";
             }
 
         }catch (PDOException $e) {
             //se produjo un error
-            $error = $e->getMessage();
-            echo json_encode(["error" => $error]);
+            $resultado['cabecera'] = "HTTP/1.1 500 Internal Server Error";
+            $resultado['datos'] = $e->getMessage();
         }
 
-            exit();
+        //devuelve el resultado
+        return $resultado;
     }
 
     /**
@@ -102,7 +103,7 @@ class Clientes {
     public static function setNewCliente($cliente){
         //realiza la conexion
         $dbConn = Conexion::connect();
-
+        $resultado = array();
         try{
             //crea la consulta
             $sql = "INSERT INTO " . self::NOMBRE_TABLA . " (" . self::NOMBRE . ", " . self::APELLIDOS . ", " . self::TELEFONO . ", " . self::EMAIL . ", " . self::DETALLE . ")
@@ -126,16 +127,17 @@ class Clientes {
 
             if($clienteId){
                 $input['id'] = $clienteId;
-                //devuelve los datos
-                header("HTTP/1.1 200 OK");
-                echo json_encode($input);
+                //guarda el resultado en el array
+                $resultado['cabecera'] = "HTTP/1.1 200 OK";
+                $resultado['id'] = $input;
             }
         }catch (PDOException $e) {
             //se produjo un error
-            $error = $e->getMessage();
-            echo json_encode(["error" => $error]);
+            $resultado['cabecera'] = "HTTP/1.1 500 Internal Server Error";
+            $resultado['id'] = $e->getMessage();
         }
-            exit();
+        //devuelve el resultado
+        return $resultado;
     }
 
     /**
@@ -146,6 +148,7 @@ class Clientes {
     public static function deleteCliente($datos){
         //realiza la conexion
         $dbConn = Conexion::connect();
+        $resultado = array();
 
         if(isset($datos['id'])){
             $id = $datos['id'];
@@ -162,21 +165,21 @@ class Clientes {
                 //comprobamos el número de filas que se han borrado
                 $registros = $statement->rowCount();
 
-                header("HTTP/1.1 200 OK");
-                echo json_encode(["Registros eliminados" => $registros]);
-
+                //guarda el resultado en el array
+                $resultado['cabecera'] = "HTTP/1.1 200 OK";
+                $resultado['Registros eliminados'] = $registros;
             }catch (PDOException $e) {
                 //se produjo un error
-                $error = $e->getMessage();
-            echo json_encode(["error" => $error]);
+                $resultado['cabecera'] = "HTTP/1.1 500 Internal Server Error";
+                $resultado['Registros eliminados'] = $e->getMessage();
             } 
         }else{
             //falta el id
-            header("HTTP/1.1 400 Bad Request");
-            echo json_encode(["400" => "Solicitud incorrecta"]);
+            $resultado['cabecera'] = "HTTP/1.1 400 Bad Request";
+            $resultado['Registros eliminados'] = "Solicitud incorrecta";
         }
-
-            exit();
+        //devuelve el resultado
+        return $resultado;
 
     }
 
@@ -186,6 +189,7 @@ class Clientes {
      * @return resultado de la modificación
      */
     public static function modificaCliente($datos){
+        $resultado = array();
             //comprueba si vienen todos los datos necesarios para la modificación
             if(self::datosCorrectos($datos)){
                 $nombre = $datos['nombre'];         
@@ -196,9 +200,9 @@ class Clientes {
                 $id = $datos['id'];
             }else{
                 //faltan datos
-                header("HTTP/1.1 422 Unprocessable Entity");
-                echo json_encode(["422" => "Solicitud incorrecta"]);
-                exit();
+                $resultado['cabecera'] = "HTTP/1.1 422 Unprocessable Entity";
+                $resultado['Registros modificados'] = "Solicitud incorrecta";
+                return $resultado;
             }
 
         //realiza la conexion
@@ -229,16 +233,17 @@ class Clientes {
 
             //comprueba cuantos registros han sido modificados
             $registros = $statement->rowCount();
-
-            header("HTTP/1.1 200 OK");
-            echo json_encode(["Registros modificados" => $registros]);
+            //guarda el resultado en el array
+            $resultado['cabecera'] = "HTTP/1.1 200 OK";
+            $resultado['Registros modificados'] = $registros;
 
         }catch (PDOException $e) {
             //se produjo un error
-            $error = $e->getMessage();
-        echo json_encode(["error" => $error]);
+            $resultado['cabecera'] = "HTTP/1.1 500 Internal Server Error";
+            $resultado['Registros modificados'] = $e->getMessage();
         } 
-        exit();
+        //devuelve el resultado
+        return $resultado;
     }
 
 
